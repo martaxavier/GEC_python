@@ -47,12 +47,16 @@ def assign_colors_markers(tags):
         'T40': crop_cmap(cm.Greens),
         'T90': crop_cmap(cm.Oranges),
     }
-    marker_map = {'SC': 'o', 'pseudoGrad_fccov': 's', 'Grad_fccov': '^'}
+    # Use visually distinct markers for each model type
+    marker_map = {
+        'SC': 'o',          # Circle
+        'pseudoGrad': 's',  # Square
+        'Grad': '^',        # Triangle
+    }
     return model_types, thresholds, lambdas, base_cmaps, marker_map
 
 def get_color_marker(thresh, lambda_idx, model_type, base_cmaps, marker_map, lambdas):
     cmap = base_cmaps.get(thresh, lambda x: (0.5, 0.5, 0.5, 1))
-    # Avoid pure white: only use middle of color spectrum
     if lambda_idx is not None and lambda_idx >= 0 and len(lambdas) > 1:
         color = cmap(lambda_idx / (len(lambdas)-1))
     else:
@@ -71,7 +75,7 @@ def lambda_from_label(label):
         return float(match.group(1))
     if label.endswith('_λ0'):
         return 0.0
-    return float('inf')  # SC etc.
+    return float('inf')  # SC etc
 
 def legend_sort_key(label):
     # Extract threshold and lambda
@@ -128,76 +132,86 @@ for f in files:
         mean_fc=np.mean(pearson_fc), mean_covtau=np.mean(pearson_covtau), mean_sc_dev=np.mean(sc_dev),
     ))
 
-# ===============  PLOTTING: FC  ================
+# ===============  PLOTTING: FC & CovTau in subplots  ================
 
-plt.figure(figsize=(10, 7))
+fig, axs = plt.subplots(2, 1, figsize=(10, 14), sharex=True)
 plotted = set()
-for r in results:
-    marker, color = get_color_marker(r['thresh'], r['lambda_idx'], r['model_type'], base_cmaps, marker_map, lambdas)
-    label = f"{r['model_type']}_{r['thresh']}"
-    if r['lambdastr']:
-        label += f"_{r['lambdastr']}"
-    # Only one legend entry per unique label
-    show_label = label if label not in plotted else None
-    edgecolor = 'none' if marker == 'o' else 'k'
-    plt.scatter(r['mean_sc_dev'], r['mean_fc'], s=90, marker=marker, color=color, edgecolor=edgecolor, label=show_label, zorder=3)
-    plotted.add(label)
+legend_labels = []
+legend_handles = []
 
-# -- Draw Pareto lines for each threshold --
-for thresh in thresholds:
-    group = [r for r in results if r['thresh'] == thresh]
-    # Sort by lambda_idx (None goes last)
-    group_sorted = sorted(group, key=lambda r: (r['lambda_idx'] is None, r['lambda_idx']))
-    xs = [r['mean_sc_dev'] for r in group_sorted]
-    ys = [r['mean_fc'] for r in group_sorted]
-    # Get base color for this threshold
-    color = base_cmaps[thresh](0.7)  # 0.7 is darker end
-    plt.plot(xs, ys, '-', color=color, linewidth=0.5, alpha=0.8, zorder=2)
-
-plt.xlabel('1 - Corr(GEC, SC)')
-plt.ylabel('Corr(FC_emp, FC_sim)')
-plt.title('FC Fit vs SC Deviation (Pearson)')
-handles, labels = plt.gca().get_legend_handles_labels()
-unique = dict(zip(labels, handles))
-# Sort labels by (threshold, lambda) order
-sorted_labels = sorted(unique.keys(), key=legend_sort_key)
-plt.legend([unique[l] for l in sorted_labels], sorted_labels,
-           bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
-plt.tight_layout()
-plt.savefig(os.path.join(plotdir, 'Pareto_FC_vs_SCdev.png'), dpi=150)
-plt.show()
-
-# ===============  PLOTTING: CovTau()  ================
-
-plt.figure(figsize=(10, 7))
-plotted = set()
+# --- FC subplot (top) ---
 for r in results:
     marker, color = get_color_marker(r['thresh'], r['lambda_idx'], r['model_type'], base_cmaps, marker_map, lambdas)
     label = f"{r['model_type']}_{r['thresh']}"
     if r['lambdastr']:
         label += f"_{r['lambdastr']}"
     show_label = label if label not in plotted else None
-    edgecolor = 'none' if marker == 'o' else 'k'
-    plt.scatter(r['mean_sc_dev'], r['mean_covtau'], s=90, marker=marker, color=color, edgecolor=edgecolor, label=show_label, zorder=3)
+    edgecolor = 'k'
+    sc = axs[0].scatter(r['mean_sc_dev'], r['mean_fc'], s=90, marker=marker, color=color, edgecolor=edgecolor, label=show_label, zorder=3)
+    if show_label:
+        legend_labels.append(label)
+        legend_handles.append(sc)
     plotted.add(label)
 
-# -- Draw Pareto lines for each threshold --
 for thresh in thresholds:
-    group = [r for r in results if r['thresh'] == thresh]
-    group_sorted = sorted(group, key=lambda r: (r['lambda_idx'] is None, r['lambda_idx']))
-    xs = [r['mean_sc_dev'] for r in group_sorted]
-    ys = [r['mean_covtau'] for r in group_sorted]
-    color = base_cmaps[thresh](0.7)  # 0.7 is darker end
-    plt.plot(xs, ys, '-', color=color, linewidth=0.5, alpha=0.8, zorder=2)
+    for model_type in ['Grad', 'pseudoGrad']:
+        group = [r for r in results if r['thresh'] == thresh and r['model_type'] == model_type]
+        if not group:
+            continue
+        group_sorted = sorted(group, key=lambda r: (r['lambda_idx'] is None, r['lambda_idx']))
+        xs = [r['mean_sc_dev'] for r in group_sorted]
+        ys = [r['mean_fc'] for r in group_sorted]
+        color = base_cmaps[thresh](0.7)
+        linestyle = '-' if model_type == 'Grad' else '--'
+        axs[0].plot(xs, ys, linestyle, color=color, linewidth=1, alpha=0.8, zorder=2)
 
-plt.xlabel('1 - Corr(GEC, SC)')
-plt.ylabel('Corr(CovTau_emp, CovTau_sim)')
-plt.title('CovTau Fit vs SC Deviation (Pearson)')
-handles, labels = plt.gca().get_legend_handles_labels()
-unique = dict(zip(labels, handles))
+axs[0].set_ylabel('Corr(FC_emp, FC_sim)', fontsize=16)
+axs[0].set_title('FC Fit vs SC Deviation (Pearson Correlation)', fontsize=18)
+axs[0].tick_params(axis='both', labelsize=14)
+
+# --- CovTau subplot (bottom) ---
+plotted = set()
+for r in results:
+    marker, color = get_color_marker(r['thresh'], r['lambda_idx'], r['model_type'], base_cmaps, marker_map, lambdas)
+    label = f"{r['model_type']}_{r['thresh']}"
+    if r['lambdastr']:
+        label += f"_{r['lambdastr']}"
+    edgecolor = 'k'
+    axs[1].scatter(r['mean_sc_dev'], r['mean_covtau'], s=90, marker=marker, color=color, edgecolor=edgecolor, label=None, zorder=3)
+    plotted.add(label)
+
+for thresh in thresholds:
+    for model_type in ['Grad', 'pseudoGrad']:
+        group = [r for r in results if r['thresh'] == thresh and r['model_type'] == model_type]
+        if not group:
+            continue
+        group_sorted = sorted(group, key=lambda r: (r['lambda_idx'] is None, r['lambda_idx']))
+        xs = [r['mean_sc_dev'] for r in group_sorted]
+        ys = [r['mean_covtau'] for r in group_sorted]
+        color = base_cmaps[thresh](0.7)
+        linestyle = '-' if model_type == 'Grad' else '--'
+        axs[1].plot(xs, ys, linestyle, color=color, linewidth=1, alpha=0.8, zorder=2)
+
+axs[1].set_xlabel('1 - Corr(GEC, SC)', fontsize=16)
+axs[1].set_ylabel('Corr(CovTau_emp, CovTau_sim)', fontsize=16)
+axs[1].set_title('CovTau Fit vs SC Deviation (Pearson Correlation)', fontsize=18)
+axs[1].tick_params(axis='both', labelsize=14)
+
+# --- Shared legend ---
+unique = {}
+for label, handle in zip(legend_labels, legend_handles):
+    if label not in unique:
+        unique[label] = handle
 sorted_labels = sorted(unique.keys(), key=legend_sort_key)
-plt.legend([unique[l] for l in sorted_labels], sorted_labels,
-           bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
-plt.tight_layout()
-plt.savefig(os.path.join(plotdir, 'Pareto_CovTau_vs_SCdev.png'), dpi=150)
+sorted_handles = [unique[l] for l in sorted_labels]
+
+fig.legend(
+    sorted_handles, sorted_labels,
+    loc='center left',
+    bbox_to_anchor=(1.00, 0.5),
+    fontsize=15, title="Models", title_fontsize=16
+)
+fig.subplots_adjust(right=0.93)
+
+plt.savefig(os.path.join(plotdir, 'Pareto_FC_CovTau_vs_SCdev.png'), dpi=150, bbox_inches='tight')
 plt.show()

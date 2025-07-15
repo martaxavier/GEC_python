@@ -2,8 +2,8 @@
 #    Generative Effective Connectivity (GEC) Estimation with JAX
 #    -----------------------------------------------------------
 #    For each subject:
-#        - Loads subject's thresholded SC and frequency vector (f_diff)
-#        - Loads BOLD time series
+#        - Loads subject's thresholded SC and peak frequency vector (f_diff)
+#        - Loads subject's BOLD time series
 #        - Computes empirical FC and Cov(τ) from the BOLD data
 #        - Initializes GEC as SC
 #        - Optimizes GEC with gradient-based true loss (FC + Cov(τ) + reg)
@@ -323,7 +323,7 @@ def estimate_GEC_per_subject(
         subj_idx:    Index of the subject.
         SC_all:      Structural connectivity array, shape (N, N, NSUB).
         ts_all:      List of BOLD time series, each (N, T).
-        f_diff:      Frequency differences, (N,).
+        f_diff:      Empirical frequencies.
         maxC:        Maximum connection strength for normalization.
         tau:         Covariance lag (seconds).
         TR:          Repetition time (seconds).
@@ -403,6 +403,7 @@ def estimate_GEC_per_subject(
     patience_counter = 0
     best_loss = float('inf')
 
+    # Optimization loop
     for i in range(num_steps):
         G, opt_state, loss = step(G, opt_state)
         losses.append(loss)

@@ -43,7 +43,7 @@ for iT, SCthresh in enumerate(SCthresh_list):
         mse_iter_sub = dat['MSE_iter_sub']
         runtime_sub = dat['Runtime_sub']
         
-        # Get MSE (should be a list of arrays, maybe padded with NaNs)
+        # Get MSE for each subject
         mse_iter_sub = dat['MSE_iter_sub']
 
         # Convert all to 1D arrays
@@ -53,7 +53,7 @@ for iT, SCthresh in enumerate(SCthresh_list):
         # Truncate all to min_len
         mse_mat = np.vstack([arr[:min_len] for arr in mse_arrs])
 
-        # Now plot mean and std up to min_len
+        # Plot mean and std up to min_len
         mean_mse = np.nanmean(mse_mat, axis=0)
         std_mse = np.nanstd(mse_mat, axis=0)
 
@@ -79,3 +79,4 @@ for iT, SCthresh in enumerate(SCthresh_list):
 
 plt.savefig(os.path.join(plotdir, f"Convergence_curves_{modeltype}.png"), dpi=120, bbox_inches='tight')
 plt.show()
+

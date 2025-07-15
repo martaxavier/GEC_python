@@ -1,3 +1,12 @@
+# ======================================================================
+#                           Fixed-SC Model
+#    -----------------------------------------------------------
+#
+#   This script simulates the fixed structural connectivity (SC) model
+#   and computes empirical and simulated functional connectivity (FC) 
+#   and covariance at a given time lag.
+# =======================================================================
+
 # Import necessary libraries
 import os
 import numpy as np
@@ -28,7 +37,7 @@ os.makedirs(plotdir, exist_ok=True)
 TR = 1.26
 sigma = 0.01
 tau = 2 * TR
-maxC = 0.2 # float('Inf')  # or your value if you want to scale
+maxC = 0.2 # float('Inf') # Use float('Inf') for no maxC scaling
 thresholds = ['t10', 't40', 't90']
 
 # ===========================
@@ -45,6 +54,9 @@ ts_all = mat_ts['mig_n2treat_func']  # Each cell is (N, T) array
 # ===========================
 
 def compute_covtau(ts, Tau):
+    """
+    Compute the covariance at a given time lag Tau for time series ts.
+    """
     N, T = ts.shape
     tst = ts.T
     COV0 = np.cov(tst, rowvar=False)
@@ -63,6 +75,10 @@ def compute_covtau(ts, Tau):
     return COVtau
 
 def compute_empirical_fc_covtau(ts, Tau):
+    """    
+    Compute empirical functional connectivity (FC) 
+    and covariance at a given time lag Tau.
+    """
     N, T = ts.shape
     ts_proc = np.zeros_like(ts)
     for i in range(N):
@@ -76,6 +92,9 @@ def compute_empirical_fc_covtau(ts, Tau):
 # ===========================
 
 def get_jacobian(G, a, omega):
+    """
+    Compute the Jacobian matrix for the model.
+    """
     N = G.shape[0]
     S = np.sum(G, axis=1)
     diag_a_S = np.diag(a - S)
@@ -89,9 +108,16 @@ def get_jacobian(G, a, omega):
     return J
 
 def lyap_solve(A, Q):
+    """
+    Solve the continuous Lyapunov equation A * P + P * A^T = -Q.
+    """
     return scipy.linalg.solve_continuous_lyapunov(A, -Q)
 
 def get_FC_sim(Sigma, N):
+    """ 
+    Compute the simulated functional connectivity (FC) 
+    from the covariance matrix Sigma.
+    """
     Sigma_xx = Sigma[:N, :N]
     epsilon = 1e-10
     stddev = np.sqrt(np.abs(np.diag(Sigma_xx))) + epsilon
@@ -100,6 +126,9 @@ def get_FC_sim(Sigma, N):
     return FC_sim
 
 def get_Cov_tau_sim(J, Sigma, tau, N):
+    """
+    Compute the covariance at a given time lag tau
+    from the Jacobian J and covariance matrix Sigma."""
     expJtau = scipy.linalg.expm(J * tau)
     Cov_full = expJtau @ Sigma
     Cov_tau_xx = Cov_full[:N, :N]
@@ -176,6 +205,8 @@ def plot_results(G, SC, FC_emp, FC_sim, Cov_tau_emp, Cov_tau_sim, plotdir, regst
 # ===============================
 
 for SCthresh in thresholds:
+
+    # Load structural connectivity data for the current threshold
     print(f"\n--- Fixed-SC: {SCthresh.upper()} ---")
     sc_all = scipy.io.loadmat(f'mig_n2treat_SC_{SCthresh}.mat')['SC_all']
     N, _, NSUB = sc_all.shape
@@ -186,6 +217,7 @@ for SCthresh in thresholds:
     MaxIter_sub = []
     Runtime_sub = []
 
+    # Run the model for each subject
     for subj in range(NSUB):
         start_time = time.time()
         SC = np.array(sc_all[:, :, subj])
@@ -199,7 +231,7 @@ for SCthresh in thresholds:
         # Empirical
         FC_emp, Cov_tau_emp = compute_empirical_fc_covtau(ts, Tau_in_samples)
 
-        # Model simulation (no optimization, G = SC)
+        # Model simulation (no optimization, GEC = SC)
         N = SC.shape[0]
         omega = f_diff[:N] * (2 * np.pi)
         a_arr = -0.02 * np.ones(N)
@@ -223,7 +255,7 @@ for SCthresh in thresholds:
 
         # ---- Plot only for subject 1 ----
         if subj == 0:
-            regstr = ""  # No lambda_reg in fixed-SC, so leave empty or set as needed
+            regstr = ""  # No lambda_reg in fixed-SC, so leave empty 
             tstr = f"_thr{SCthresh[1:]}"
             plot_results(
                 G, SC, FC_emp, FC_sim,

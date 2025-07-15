@@ -1,3 +1,4 @@
+# Import necessary libraries
 import os
 import numpy as np
 import scipy.io
@@ -29,7 +30,7 @@ SCthresh_list = ['t10', 't40', 't90']
 # model_type = "Grad_fccov"
 # lambda_list = ['', 'λ1', 'λ0.1', 'λ0']   # For Grad_fccov
 model_type = "pseudoGrad_fccov"
-lambda_list = ['', 'λ0.001', 'λ0.0001', 'λ0']  # For pseudoGrad_fccov
+lambda_list = ['', 'λ0.005', 'λ0.001', 'λ0']  # For pseudoGrad_fccov
 
 # Define directories
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -197,3 +198,58 @@ plot_grid(
     cbar_label='Cov(τ)',
     filename='CovTauSim_matrices.png'
 )
+
+# ==============================
+# Plot Empirical Matrices
+# ==============================
+
+# Use any T90 result file to load empirical matrices (first in list)
+empirical_file = sorted(glob.glob(os.path.join(simdir, 'modelFit_SCopt_*.npz')))[10]
+data = np.load(empirical_file, allow_pickle=True)
+example_subj = 0
+
+# Optionally reorder
+def reorder(mat):
+    return mat[H2N_ind, :][:, H2N_ind] if H2N_ordering else mat
+
+# Plot Empirical SC
+SC_emp = reorder(data['SC_sub'][example_subj])
+plt.figure(figsize=(6,6))
+plt.imshow(SC_emp, cmap='viridis', vmin=0, vmax=2)
+if H2N_ordering:
+    plot_network_bars(plt.gca(), labels, network_names, network_colors)
+plt.title("Empirical Structural Connectivity (SC)")
+plt.colorbar(label="Connection Strength")
+plt.xlabel('Regions', fontsize=14)
+plt.ylabel('Regions', fontsize=14)
+plt.xticks([]); plt.yticks([])
+plt.savefig(os.path.join(plotdir, "Empirical_SC.png"), dpi=200, bbox_inches='tight')
+plt.show()
+
+# Plot Empirical FC
+FC_emp = reorder(data['FCemp_sub'][example_subj])
+plt.figure(figsize=(6,6))
+plt.imshow(FC_emp, cmap='viridis', vmin=-1, vmax=1)
+if H2N_ordering:
+    plot_network_bars(plt.gca(), labels, network_names, network_colors)
+plt.title("Empirical Functional Connectivity (FC)")
+plt.colorbar(label="FC")
+plt.xlabel('Regions', fontsize=14)
+plt.ylabel('Regions', fontsize=14)
+plt.xticks([]); plt.yticks([])
+plt.savefig(os.path.join(plotdir, "Empirical_FC.png"), dpi=200, bbox_inches='tight')
+plt.show()
+
+# Plot Empirical CovTau
+CovTau_emp = reorder(data['CovTauEmp_sub'][example_subj])
+plt.figure(figsize=(6,6))
+plt.imshow(CovTau_emp, cmap='viridis', vmin=-1, vmax=1)
+if H2N_ordering:
+    plot_network_bars(plt.gca(), labels, network_names, network_colors)
+plt.title("Empirical CovTau(τ)")
+plt.colorbar(label="Cov(τ)")
+plt.xlabel('Regions', fontsize=14)
+plt.ylabel('Regions', fontsize=14)
+plt.xticks([]); plt.yticks([])
+plt.savefig(os.path.join(plotdir, "Empirical_CovTau.png"), dpi=200, bbox_inches='tight')
+plt.show()

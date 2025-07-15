@@ -3,7 +3,7 @@
 #    -----------------------------------------------------------
 #    For each subject:
 #        - Loads subject's thresholded SC and frequency vector (f_diff)
-#        - Loads BOLD time series
+#        - Loads subject's BOLD time series
 #        - Computes empirical FC and Cov(τ) from the BOLD data
 #        - Initializes GEC as SC
 #        - Optimizes GEC with pseudo-gradient-based loss (FC + Cov(τ) + reg)
@@ -71,11 +71,6 @@ print("Loading data...")
 f_diff = scipy.io.loadmat('empirical_mig_n2treat.mat')['f_diff'].flatten()
 mat_ts = scipy.io.loadmat('mig_n2treat_func.mat')
 ts_all = mat_ts['mig_n2treat_func']  # Each cell is (N, T) array
-
-# ===========================
-#     EMPIRICAL FC/COVTAU
-# ===========================
-
 
 # ===========================
 #     EMPIRICAL FC/COVTAU
@@ -305,7 +300,7 @@ def estimate_GEC_per_subject_pseudograd(
         mse_fc_hist.append(mse_fc)
         mse_cov_hist.append(mse_cov)
 
-        # Early stopping w/ patience 
+        # Early stopping 
         if mse < old_best - tol:
             old_best = mse
             patience_counter = 0
